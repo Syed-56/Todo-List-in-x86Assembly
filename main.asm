@@ -11,6 +11,7 @@ INCLUDE Irvine32.inc
 	msgOpt4 BYTE " 4) Update Task", 0
 	msgOpt5 BYTE " 5) Remove Task", 0
 	msgExit BYTE " 6) EXIT", 0
+	msgOptionInput BYTE "Enter Option: ", 0
 
 .code
 
@@ -61,10 +62,24 @@ mainScreen PROC
 	RET
 mainScreen ENDP
 
+validateOption PROC
+	LOCAL opt:BYTE
+
+	mainLoop:
+		call mainScreen
+		MOV EDX, OFFSET msgOptionInput
+		call writeString
+		call readInt
+		MOV BL, 6
+		CMP AL, BL
+		JNE mainLoop
+	RET
+validateOption ENDP
+
 main PROC
 
 	call titlePage
-	call mainScreen
+	call validateOption
 
 	exit
 main ENDP
