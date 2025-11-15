@@ -1,5 +1,7 @@
 INCLUDE Irvine32.inc
 
+MAX_TASKS 10
+
 .data
 	heading BYTE "                         |=====================    TODO LIST    =====================|", 0
 	devs BYTE "  ------------------------ Made By: Syed Sultan Ahmed , Hassaan Nasir, Asad Khan ---------------------------", 0
@@ -11,9 +13,32 @@ INCLUDE Irvine32.inc
 	msgOpt4 BYTE " 4) Update Task", 0
 	msgOpt5 BYTE " 5) Remove Task", 0
 	msgExit BYTE " 6) EXIT", 0
-	msgOptionInput BYTE "Enter Option: ", 0
+	msgOptionInput BYTE " Enter Option: ", 0
+	invalidMsg BYTE " Invalid Option", 0
+	msgTaskLimit BYTE "Task Limit Reached"
+
+	msgInputTask BYTE " Enter Task: ", 0
+	msgInputTaskDate BYTE " Enter Completion Date: ", 0
+	msgInvalidTaskDate BYTE " Task Date is invalid", 0
+	msgTaskAdded BYTE " Task Added Successfully", 0
+	msgTaskCompleteNum BYTE " Enter Task Number to Complete: ", 0
+	msgTaskCompleted BYTE " Task Completed Successfully", 0
+	msgTaskUpdateNum BYTE " Enter Task Number to Update: ", 0
+	msgTaskUpdateWhat BYTE " Enter 1 to Update Task's message and 2 to update Task's Due Date", 0
+	msgTaskUpdateComplete BYTE " Task Updated Successfully", 0
+	msgRemoveTaskNum BYTE " Enter Task Number to Remove: ", 0
+	msgRemoveComplete BYTE " Task Removed Successfully", 0
+
+	taskCount DWORD 0
+
 
 .code
+
+addTask PROTO
+viewTask PROTO
+completeTask PROTO
+updateTask PROTO
+removeTask PROTO
 
 titlePage PROC
 	call crlf
@@ -62,26 +87,92 @@ mainScreen PROC
 	RET
 mainScreen ENDP
 
-validateOption PROC
-	LOCAL opt:BYTE
+inputOption PROC
+	call mainScreen
+	MOV EDX, OFFSET msgOptionInput
+	call writeString
+	call readDec
+	RET
+inputOption ENDP
 
-	mainLoop:
-		call mainScreen
-		MOV EDX, OFFSET msgOptionInput
+validateOption PROC opt:DWORD
+
+	MOV EAX, opt
+	CMP EAX, 1
+	JE addTaskOption
+	CMP EAX, 2
+	JE viewTaskOption
+	CMP EAX, 3
+	JE completeTaskOption
+	CMP EAX, 4
+	JE updateTaskOption
+	CMP EAX, 5
+	JE removeTaskOption
+
+	JMP invalidOption
+
+	addTaskOption:
+		INVOKE addTask
+		JMP done
+	viewTaskOption:
+		INVOKE viewTask
+		JMP done
+	completeTaskOption:
+		INVOKE completeTask
+		JMP done
+	updateTaskOption:
+		INVOKE updateTask
+		JMP done
+	removeTaskOption:
+		INVOKE removeTask
+		JMP done
+
+	invalidOption:
+		MOV EDX, OFFSET invalidMsg
 		call writeString
-		call readInt
-		MOV BL, 6
-		CMP AL, BL
-		JNE mainLoop
+		call Crlf
+		JMP done
+
+	done:
 	RET
 validateOption ENDP
 
 main PROC
-
 	call titlePage
-	call validateOption
+	mainLoop:
+		call inputOption
+		CMP EAX, 6
+		JE finish
+		INVOKE validateOption, EAX
+		JMP mainLoop
 
+	finish:
 	exit
 main ENDP
+
+addTask PROC
+
+	RET
+addTask ENDP
+
+viewTask PROC
+
+	RET
+viewTask ENDP
+
+completeTask PROC
+
+	RET
+completeTask ENDP
+
+updateTask PROC
+
+	RET
+updateTask ENDP
+
+removeTask PROC
+
+	RET
+removeTask ENDP
 
 END main
