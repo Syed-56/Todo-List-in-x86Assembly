@@ -10,8 +10,8 @@ lines   BYTE "==================================================================
 msgOpt1 BYTE " 1) Add Task",0
 msgOpt2 BYTE " 2) View Tasks",0
 msgOpt3 BYTE " 3) Complete Task",0
-msgOpt4 BYTE " 4) Update Task",0
-msgOpt5 BYTE " 5) Remove Task",0
+msgOpt4 BYTE " 4) Update Task",0                     
+msgOpt5 BYTE " 5) Remove Task",0         
 msgExit BYTE " 6) EXIT",0
 msgOptionInput BYTE " Enter Option: ",0
 invalidMsg BYTE " Invalid Option",0
@@ -28,17 +28,24 @@ msgTaskCompleteNum BYTE " Enter Task Number to Complete: ",0
 msgTaskCompleted BYTE " Task Completed Successfully",0
 
 msgTaskUpdateNum BYTE " Enter Task Number to Update: ",0
-msgTaskUpdateWhat BYTE " Enter 1 to Update Task's message and 2 to update Task's Due Date",0
+msgTaskUpdateWhat BYTE " Enter 1 to Update Task's message and 2 to update Task's Due Date:",0
 msgTaskUpdateComplete BYTE " Task Updated Successfully",0
 
 msgRemoveTaskNum BYTE " Enter Task Number to Remove: ",0
 msgRemoveComplete BYTE " Task Removed Successfully",0
+msgTaskNumexceed BYTE " Task is not present, please enter the Task Number again: ",0
 
 msgDot BYTE " ) ",0
 msgSpace BYTE "    ",0
 msgStatusSpace BYTE "    Status: ",0
 msgNotCompleted BYTE "Not Completed",0
 msgCompleted BYTE "Completed",0
+
+; Console color constants
+STD_OUTPUT_HANDLE EQU -11
+COLOR_RED    EQU 12   ; Red text
+COLOR_GREEN  EQU 10   ; Green text
+COLOR_WHITE  EQU 15  ; Default white
 
 taskCount DWORD 0
 
@@ -47,6 +54,10 @@ taskDates    BYTE MAX_TASKS*12 DUP(?)
 taskStatus   BYTE MAX_TASKS DUP(?)  
 
 .code
+
+; Declare API functions for console colors
+GetStdHandle PROTO, nStdHandle:DWORD
+SetConsoleTextAttribute PROTO, hConsole:DWORD, wAttributes:WORD
 
 addTask PROTO
 viewTask PROTO
@@ -238,7 +249,7 @@ stripdone:
 
     mov eax, taskCount
     lea edx, taskStatus[eax]
-    mov byte ptr [edx], 0
+    mov byte ptr [edx], 0        ; initialize task as "Not Completed"
 
     inc taskCount
     mov edx, OFFSET msgTaskAdded
@@ -293,17 +304,38 @@ viewloop:
     mov edx, OFFSET msgStatusSpace
     call WriteString
 
+    ; --- Begin Color Logic ---
+    push STD_OUTPUT_HANDLE
+    call GetStdHandle
+    mov esi, eax                 ; store console handle
+
     mov eax, ecx
     mov bl, taskStatus[eax]
     cmp bl,0
-    je notCompleted
+    je setRed
+
+    ; Completed -> Green
+    push COLOR_GREEN
+    push esi
+    call SetConsoleTextAttribute
     mov edx, OFFSET msgCompleted
     call WriteString
-    jmp statusDone
-notCompleted:
+    jmp resetColor
+
+setRed:
+    ; Not Completed -> Red
+    push COLOR_RED
+    push esi
+    call SetConsoleTextAttribute
     mov edx, OFFSET msgNotCompleted
     call WriteString
-statusDone:
+
+resetColor:
+    ; Reset to default white
+    push COLOR_WHITE
+    push esi
+    call SetConsoleTextAttribute
+    ; --- End Color Logic ---
 
     call crlf
 
@@ -356,12 +388,223 @@ invalidTaskNum:
     ret
 completeTask ENDP
 
-
 updateTask PROC
+    mov eax, taskCount
+    cmp eax, 0
+    je noTasksUpdate
+
+
+
+    mov edx, OFFSET msgTaskUpdateNum
+    call WriteString
+readTaskNum:
+    call ReadDec
+    dec eax
+    cmp eax, 0
+    jl invalidNum
+    cmp eax, taskCount
+    jge invalidNum
+
+    mov ebx, eax
+
+    mov edx, OFFSET msgTaskUpdateWhat
+    call WriteString
+
+readChoice:
+    call ReadDec
+    cmp eax, 1
+    je updateMsg
+    cmp eax, 2
+    je updateDate
+    jmp readChoice
+
+updateMsg:
+    mov edx, OFFSET msgInputTask
+    call WriteString
+
+    mov eax, ebx
+    imul eax, 50
+    lea edx, taskMessages[eax]
+    mov ecx, 50
+    call ReadString
+    jmp updatedDone
+
+updateDate:
+dateLoop:
+    mov edx, OFFSET msgInputTaskDate
+    call WriteString
+
+    mov eax, ebx
+    imul eax, 12
+    lea esi, taskDates[eax]
+    mov edx, esi
+    mov ecx, 12
+    call ReadString
+
+stripLoop:
+    mov al, [esi]
+    cmp al, 0
+    je stripDone
+    cmp al, 13
+    je setNull
+    cmp al, 10
+    je setNull
+    inc esi
+    jmp stripLoop
+setNull:
+
+    mov byte ptr [esi], 0
+    inc esi
+    jmp stripLoop
+stripDone:
+
+    mov eax, ebx
+    imul eax, 12
+    lea esi, taskDates[eax]
+
+    cmp byte ptr [esi+2], '/'
+    jne invalidDate
+    cmp byte ptr [esi+5], '/'
+    jne invalidDate
+
+    movzx eax, byte ptr [esi]
+    sub eax, '0'
+    movzx ebx, byte ptr [esi+1]
+    sub ebx, '0'
+    imul eax, 10
+    add eax, ebx
+    cmp eax, 1
+    jl invalidDate
+    cmp eax, 30
+    jg invalidDate
+
+    movzx eax, byte ptr [esi+3]
+    sub eax, '0'
+    movzx ebx, byte ptr [esi+4]
+    sub ebx, '0'
+    imul eax, 10
+    add eax, ebx
+    cmp eax, 1
+    jl invalidDate
+    cmp eax, 12
+    jg invalidDate
+
+    movzx eax, byte ptr [esi+6]
+    sub eax, '0'
+    movzx ebx, byte ptr [esi+7]
+    sub ebx, '0'
+    imul eax, 10
+    add eax, ebx
+    imul eax, 100
+    mov ecx, eax
+    movzx eax, byte ptr [esi+8]
+    sub eax, '0'
+    movzx ebx, byte ptr [esi+9]
+    sub ebx, '0'
+    imul eax, 10
+    add eax, ebx
+    add ecx, eax
+    cmp ecx, 2025
+    jl invalidDate
+    jmp updatedDone
+
+invalidDate:
+    mov edx, OFFSET msgInvalidTaskDate
+    call WriteString
+    call crlf
+    jmp dateLoop
+
+updatedDone:
+    mov edx, OFFSET msgTaskUpdateComplete
+    call WriteString
+    call crlf
     ret
+
+invalidNum:
+    mov edx, OFFSET msgTaskNumexceed
+    call WriteString
+    jmp readTaskNum
+
+noTasksUpdate:
+    mov edx, OFFSET msgNoTasks
+    call WriteString
+    call crlf
+    ret
+   
 updateTask ENDP
 
 removeTask PROC
+    mov eax, taskCount                               
+    cmp eax, 0                               
+    je noTasksRemove
+
+    mov edx, OFFSET msgRemoveTaskNum
+    call WriteString
+
+readAgain:
+    call ReadDec
+    dec eax
+    cmp eax, 0
+    jl invalid
+    cmp eax, taskCount
+    jge invalid
+
+    mov ebx, eax
+    mov ecx, taskCount
+    dec ecx
+    sub ecx, ebx
+    jz skipShift
+
+    mov eax, ebx
+    imul eax, 50
+    lea edi, taskMessages[eax]
+    lea esi, taskMessages[eax+50]
+    mov edx, ecx
+    imul edx, 50
+    mov ecx, edx
+    cld
+    rep movsb
+
+    mov eax, ebx
+    imul eax, 12
+    lea edi, taskDates[eax]
+    lea esi, taskDates[eax+12]
+    mov edx, ecx
+    mov ecx, taskCount
+    sub ecx, ebx
+    dec ecx
+    imul ecx, 12
+    cld
+    rep movsb
+
+    lea edi, taskStatus[ebx]
+    lea esi, taskStatus[ebx+1]
+    mov ecx, taskCount
+    sub ecx, ebx
+    dec ecx
+    cld
+    rep movsb
+
+skipShift:
+    mov eax, taskCount
+    dec eax
+    mov taskCount, eax
+
+    mov edx, OFFSET msgRemoveComplete
+    call WriteString
+    call crlf
+    ret
+
+invalid:
+    mov edx, OFFSET msgTaskNumexceed
+    call WriteString
+   
+    jmp readAgain
+
+noTasksRemove:
+    mov edx, OFFSET msgNoTasks
+    call WriteString
+    call crlf
     ret
 removeTask ENDP
 
